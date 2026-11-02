@@ -69,9 +69,11 @@ skill. Compare changes in errors, not signed PBIAS differences alone.
 Metrics are selected globally across all evaluation variables.
 `Inundation_CSI` is **automatically skipped** for variables other than
 `Inundation_Fraction`, avoiding errors for mixed streamflow/inundation
-evaluations. The preflight CLI check rejects a CSI selection if no
-inundation-fraction variable is requested. It also rejects event-peak timing
-metrics when the evaluation resolution is monthly or annual.
+evaluations. Q95/Q99 Bias and flood peak timing statistics are only computed
+for Streamflow; they are skipped for all other variables. The preflight CLI
+check rejects a CSI selection if no inundation-fraction variable is requested,
+or flow metrics if no Streamflow is requested. It also rejects event-peak
+timing metrics when the evaluation resolution is monthly or annual.
 
 This feature branch is based on the latest `jellywzx/OpenBench` main
 (2026-11-02), not the 2026-10-12 main underlying the original feature.

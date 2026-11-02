@@ -223,13 +223,18 @@ class Evaluation_grid(metrics, scores):
         self.author = "Zhongwang Wei / zhongwang007@gmail.com"
         self.__dict__.update(info)
 
-        # Metrics are configured globally: CSI is only defined for inundation
-        # fractions. Skip it for other items without aborting mixed runs.
-        if getattr(self, "item", None) != "Inundation_Fraction" and "Inundation_CSI" in getattr(
-            self, "metrics", ()
-        ):
-            logging.info("Skipping Inundation_CSI for %s: requires Inundation_Fraction", self.item)
-            self.metrics = [name for name in self.metrics if name != "Inundation_CSI"]
+        # The configuration selects metrics globally. Only calculate the
+        # discharge metrics for Streamflow, and CSI for Inundation_Fraction;
+        # retain other selected metrics for both variables.
+        incompatible = set()
+        if getattr(self, "item", None) != "Streamflow":
+            incompatible.update({"Q95_Bias", "Q99_Bias", "PeakTimingError", "PeakTimingMatchRate"})
+        if getattr(self, "item", None) != "Inundation_Fraction":
+            incompatible.add("Inundation_CSI")
+        excluded = incompatible.intersection(getattr(self, "metrics", ()) or ())
+        if excluded:
+            logging.info("Skipping incompatible metrics %s for %s", sorted(excluded), self.item)
+            self.metrics = [name for name in self.metrics if name not in excluded]
         self.fig_nml = fig_nml
         os.makedirs(self.casedir, exist_ok=True)
 
@@ -534,13 +539,18 @@ class Evaluation_stn(metrics, scores):
         self.fig_nml = fig_nml
         self.__dict__.update(info)
 
-        # Metrics are configured globally: CSI is only defined for inundation
-        # fractions. Skip it for other items without aborting mixed runs.
-        if getattr(self, "item", None) != "Inundation_Fraction" and "Inundation_CSI" in getattr(
-            self, "metrics", ()
-        ):
-            logging.info("Skipping Inundation_CSI for %s: requires Inundation_Fraction", self.item)
-            self.metrics = [name for name in self.metrics if name != "Inundation_CSI"]
+        # The configuration selects metrics globally. Only calculate the
+        # discharge metrics for Streamflow, and CSI for Inundation_Fraction;
+        # retain other selected metrics for both variables.
+        incompatible = set()
+        if getattr(self, "item", None) != "Streamflow":
+            incompatible.update({"Q95_Bias", "Q99_Bias", "PeakTimingError", "PeakTimingMatchRate"})
+        if getattr(self, "item", None) != "Inundation_Fraction":
+            incompatible.add("Inundation_CSI")
+        excluded = incompatible.intersection(getattr(self, "metrics", ()) or ())
+        if excluded:
+            logging.info("Skipping incompatible metrics %s for %s", sorted(excluded), self.item)
+            self.metrics = [name for name in self.metrics if name not in excluded]
         if isinstance(self.sim_varname, str):
             self.sim_varname = [self.sim_varname]
         if isinstance(self.ref_varname, str):

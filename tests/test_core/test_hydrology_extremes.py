@@ -175,15 +175,15 @@ def test_csi_skips_other_variables_in_both_evaluation_paths(tmp_path, monkeypatc
     config = {
         "item": "Streamflow",
         "casedir": str(tmp_path),
-        "metrics": ["KGE", "Inundation_CSI"],
+        "metrics": ["KGE", "Inundation_CSI", "Q95_Bias", "PeakTimingError"],
         "sim_varname": "qsim",
         "ref_varname": "qobs",
     }
     grid = evaluation.Evaluation_grid(config, {})
     station = evaluation.Evaluation_stn(config, {})
-    assert grid.metrics == ["KGE"]
-    assert station.metrics == ["KGE"]
-    assert config["metrics"] == ["KGE", "Inundation_CSI"]
+    assert grid.metrics == ["KGE", "Q95_Bias", "PeakTimingError"]
+    assert station.metrics == ["KGE", "Q95_Bias", "PeakTimingError"]
+    assert config["metrics"] == ["KGE", "Inundation_CSI", "Q95_Bias", "PeakTimingError"]
 
     flooded = dict(config, item="Inundation_Fraction")
     inundation = evaluation.Evaluation_grid(flooded, {})

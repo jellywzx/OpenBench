@@ -106,6 +106,17 @@ def metric_score_errors(cfg: Any, effective_tim_res: str | None) -> list[str]:
                 "it cannot be evaluated directly on Inundation_Area or Streamflow."
             )
 
+    discharge_metrics = {"Q95_Bias", "Q99_Bias", "PeakTimingError", "PeakTimingMatchRate"} & set(
+        selected_metrics
+    )
+    if discharge_metrics:
+        variables = getattr(getattr(cfg, "evaluation", None), "variables", None)
+        if variables is not None and "Streamflow" not in variables:
+            errors.append(
+                "High-flow quantiles and flood-peak timing require Streamflow in "
+                "evaluation.variables; these metrics are skipped for other variables."
+            )
+
     if resolution in {"climatology-month", "climatology-year"}:
         from openbench.data.climatology import ClimatologyProcessor
 
