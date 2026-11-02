@@ -49,12 +49,17 @@ def _peak_stats_1d(sim, obs, days, threshold_quantile, separation_days, window_d
         return np.nan, np.nan
 
     def complete_neighbors(indices):
-        return np.asarray([
-            i for i in indices
-            if i > 0 and i < len(days) - 1
-            and days[i] - days[i - 1] <= 1.5
-            and days[i + 1] - days[i] <= 1.5
-        ], dtype=int)
+        return np.asarray(
+            [
+                i
+                for i in indices
+                if i > 0
+                and i < len(days) - 1
+                and days[i] - days[i - 1] <= 1.5
+                and days[i + 1] - days[i] <= 1.5
+            ],
+            dtype=int,
+        )
 
     observed_peaks = complete_neighbors(find_peaks(obs)[0])
     observed_peaks = observed_peaks[(obs[observed_peaks] > 0) & (obs[observed_peaks] >= threshold)]
@@ -73,8 +78,7 @@ def _peak_stats_1d(sim, obs, days, threshold_quantile, separation_days, window_d
     errors = []
     for idx in independent:
         nearby = [
-            int(j) for j in model_peaks
-            if int(j) not in used and abs(days[j] - days[idx]) <= window_days
+            int(j) for j in model_peaks if int(j) not in used and abs(days[j] - days[idx]) <= window_days
         ]
         if not nearby:
             continue
@@ -84,8 +88,7 @@ def _peak_stats_1d(sim, obs, days, threshold_quantile, separation_days, window_d
         used.add(chosen)
         errors.append(abs(float(days[chosen] - days[idx])))
 
-    return (float(np.mean(errors)) if errors else np.nan,
-            float(len(errors) / len(independent)))
+    return (float(np.mean(errors)) if errors else np.nan, float(len(errors) / len(independent)))
 
 
 def peak_timing_stats(
@@ -120,7 +123,9 @@ def peak_timing_stats(
         obs = obs.chunk({"time": -1})
     return xr.apply_ufunc(
         _peak_stats_1d,
-        sim, obs, time_days,
+        sim,
+        obs,
+        time_days,
         input_core_dims=[["time"], ["time"], ["time"]],
         output_core_dims=[[], []],
         kwargs={
@@ -128,7 +133,9 @@ def peak_timing_stats(
             "separation_days": separation_days,
             "window_days": window_days,
         },
-        vectorize=True, dask="parallelized", output_dtypes=[float, float],
+        vectorize=True,
+        dask="parallelized",
+        output_dtypes=[float, float],
     )
 
 
@@ -174,7 +181,8 @@ def inundation_spatial_csi(sim: xr.DataArray, obs: xr.DataArray, threshold: floa
         raise ValueError("Spatial inundation CSI requires a rectilinear lat/lon grid")
     weights = xr.DataArray(
         np.maximum(np.cos(np.deg2rad(sim.lat.values)), 0.0),
-        dims=["lat"], coords={"lat": sim.lat},
+        dims=["lat"],
+        coords={"lat": sim.lat},
     )
     valid = finite & domain
     s_wet, o_wet = sim > threshold, obs > threshold
@@ -188,11 +196,13 @@ def inundation_spatial_csi(sim: xr.DataArray, obs: xr.DataArray, threshold: floa
     misses = area_of(valid & ~s_wet & o_wet)
     valid_weight = area_of(valid)
     union = hits + false_alarms + misses
-    return xr.Dataset({
-        "CSI_spatial": xr.where(union > 0, hits / union, np.nan),
-        "hit_weight": hits,
-        "false_alarm_weight": false_alarms,
-        "miss_weight": misses,
-        "valid_weight": valid_weight,
-    })
+    return xr.Dataset(
+        {
+            "CSI_spatial": xr.where(union > 0, hits / union, np.nan),
+            "hit_weight": hits,
+            "false_alarm_weight": false_alarms,
+            "miss_weight": misses,
+            "valid_weight": valid_weight,
+        }
+    )
 
