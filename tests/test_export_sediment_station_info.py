@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import xarray as xr
-
 from scripts.export_sediment_station_info import (
     find_evaluated_station_file,
     merge_evaluated_with_metadata,
@@ -100,7 +99,14 @@ def test_result_lookup_prefers_metrics_and_is_pair_specific(tmp_path: Path):
     assert found == metrics / name
 
 
-def test_station_map_labels_every_station(tmp_path: Path):
+def test_station_map_labels_every_station(tmp_path: Path, monkeypatch):
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+
+    empty_feature = cfeature.ShapelyFeature([], ccrs.PlateCarree())
+    for name in ("LAND", "OCEAN", "COASTLINE", "BORDERS"):
+        monkeypatch.setattr(cfeature, name, empty_feature)
+
     stations = pd.DataFrame(
         {
             "station_id": ["0007", "B"],
@@ -119,6 +125,7 @@ def test_station_map_labels_every_station(tmp_path: Path):
         extent=(0.0, 30.0, -5.0, 5.0),
         dpi=72,
         label_fontsize=5,
+        map_features={"show_rivers": False},
     )
 
     assert labels == len(stations)

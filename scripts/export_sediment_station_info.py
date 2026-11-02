@@ -9,11 +9,11 @@ time-series variable is loaded.
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping
 import logging
 import os
-from pathlib import Path
 import tempfile
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -21,7 +21,6 @@ import pandas as pd
 
 from openbench.util.filenames import join_filename_components
 from openbench.util.station_ids import read_station_csv, station_id_key
-
 
 LOG = logging.getLogger("export_sediment_station_info")
 SEDIMENT_VARIABLES = (
@@ -358,8 +357,8 @@ def _effective_reference(cfg, resolved):
 
 def export(args: argparse.Namespace) -> list[tuple[Path, list[Path]]]:
     from openbench.cli.run import _expand_config_paths
-    from openbench.config.adapter import build_fig_nml
     from openbench.config import load_config
+    from openbench.config.adapter import build_fig_nml
     from openbench.config.resolver import resolve_all_references
     from openbench.data.registry.manager import get_registry
     from openbench.data.station_matcher import resolve_station_dataset
