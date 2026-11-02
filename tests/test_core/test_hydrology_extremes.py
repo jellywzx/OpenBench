@@ -6,6 +6,8 @@ import pytest
 import xarray as xr
 
 from openbench.core.metrics import metrics
+from openbench.cli._metric_guidance import metric_score_errors
+from types import SimpleNamespace
 from openbench.core.registry import METRICS_ITEMS, METRIC_LABELS
 from openbench.core._hydrology_extreme_metrics import inundation_spatial_csi
 
@@ -121,3 +123,48 @@ def test_csi_requires_inundation_fraction_in_evaluation():
     with pytest.raises(ValueError, match="Inundation_Fraction"):
         evaluator.Inundation_CSI(daily([0.1, 0.2]), daily([0.1, 0.2]))
 
+
+def test_preflight_checks_flood_peak_resolution_and_csi_variable():
+    cfg = SimpleNamespace(
+        metrics=["PeakTimingError", "PeakTimingMatchRate", "Inundation_CSI"],
+        scores=[],
+        project=SimpleNamespace(years=(2001, 2001)),
+        evaluation=SimpleNamespace(variables=["Streamflow"]),
+    )
+    errors = metric_score_errors(cfg, "Month")
+    assert any("PeakTimingError" in error for error in errors)
+    assert any("PeakTimingMatchRate" in error for error in errors)
+    assert any("Inundation_CSI" in error for error in errors)
+
+    cfg.evaluation.variables = ["Streamflow", "Inundation_Fraction"]
+    assert metric_score_errors(cfg, "Day") == []
+
+
+def test_csi_skipped_only_for_non_inundation_evaluations(tmp_path, monkeypatch):
+    from openbench.core import evaluation
+
+    monkeypatch.setattr(evaluation, "_HAS_OUTPUT_MANAGER", False)
+    info = {
+        "item": "Streamflow",
+        "casedir": str(tmp_path),
+        "metrics": ["KGE", "Inundation_CSI"],
+        "sim_varname": "qsim",
+        "ref_varname": "qobs",
+    }
+    grid = evaluation.Evaluation_grid(info, {})
+    station = evaluation.Evaluation_stn(info, {})
+    assert grid.metrics == ["KGE"]
+    assert station.metrics == ["KGE"]
+    assert info["metrics"] == ["KGE", "Inundation_CSI"]
+
+    inundation = dict(info, item="Inundation_Fraction")
+    grid_inundation = evaluation.Evaluation_grid(inundation, {})
+    assert grid_inundation.metrics == ["KGE", "Inundation_CSI"]
+
+
+def test_climatology_disallows_event_peak_metrics():
+    from openbench.data.climatology import ClimatologyProcessor
+
+    processor = ClimatologyProcessor()
+    for name in ("PeakTimingError", "PeakTimingMatchRate"):
+        assert not processor.is_metric_supported(name, clim_type="monthly", time_points=12)

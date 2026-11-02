@@ -63,3 +63,15 @@ valid timestamps**. Positive delta-KGE indicates better skill; positive
 difference in absolute quantile bias or absolute timing error means worse
 skill. Compare changes in errors, not signed PBIAS differences alone.
 
+
+## Compatibility with current OpenBench main
+
+Metrics are selected globally across all evaluation variables.
+`Inundation_CSI` is **automatically skipped** for variables other than
+`Inundation_Fraction`, avoiding errors for mixed streamflow/inundation
+evaluations. The preflight CLI check rejects a CSI selection if no
+inundation-fraction variable is requested. It also rejects event-peak timing
+metrics when the evaluation resolution is monthly or annual.
+
+This feature branch is based on the latest `jellywzx/OpenBench` main
+(2026-11-02), not the 2026-10-12 main underlying the original feature.

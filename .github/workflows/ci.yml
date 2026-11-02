@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, feature/uncertainty-aware-evaluation]
+    branches: [main, master, feature/uncertainty-aware-evaluation, feature/hydro-peaks-inundation-csi-main-20261102]
   pull_request:
     branches: [main, master]
 
