@@ -52,6 +52,7 @@ comparison:
     - Taylor_Diagram
     - HeatMap
     - Diff_Plot
+    # - Diff_Kernel_Density_Estimate  # KDE of pairwise gridded Diff_Plot values
 
 statistics:
   enabled: false
