@@ -83,15 +83,9 @@ def test_station_spatial_score_is_one_network_value_and_updates_overall(tmp_path
             ),
             0,
         )
-<<<<<<< HEAD
-        expected_overall = (
-            worker_row["_overall_nonspatial_numerator"] + expected_spatial
-        ) / (worker_row["_overall_nonspatial_denominator"] + 1.0)
-=======
         expected_overall = (worker_row["_overall_nonspatial_numerator"] + expected_spatial) / (
             worker_row["_overall_nonspatial_denominator"] + 1.0
         )
->>>>>>> upstream/main
         assert frame.loc[row_index, "Overall_Score"] == pytest.approx(expected_overall)
 
     assert not any(column.startswith("_") for column in frame.columns)
@@ -105,6 +99,20 @@ def test_overall_implicitly_uses_spatial_score_without_output_column(tmp_path, m
 
     assert "nSpatialScore" not in frame.columns
     assert np.isfinite(frame["Overall_Score"]).all()
+
+
+@pytest.mark.parametrize("level", [0.0, 5.0])
+def test_constant_station_keeps_spatial_but_not_overall(tmp_path, monkeypatch, level):
+    evaluator = _station_evaluator(tmp_path, ["nSpatialScore", "Overall_Score"], {"A": (10.0, 12.0), "B": (20.0, 18.0)})
+    path = tmp_path / "data" / "stn_Ref_Sim" / "Runoff_ref_A_2000_2001.nc"
+    with xr.open_dataset(path) as ds:
+        changed = ds.load()
+    changed["flow"][:] = level
+    changed.to_netcdf(path, mode="w")
+    frame = _run_and_read(evaluator, tmp_path, monkeypatch)
+    assert np.isfinite(frame["nSpatialScore"]).all()
+    assert np.isnan(frame.loc[frame.ID == "A", "Overall_Score"]).all()
+    assert np.isfinite(frame.loc[frame.ID == "B", "Overall_Score"]).all()
 
 
 def test_unavailable_station_is_excluded_from_network_score(tmp_path, monkeypatch):
@@ -167,17 +175,24 @@ def test_overall_skips_undefined_implicit_spatial_component(tmp_path, monkeypatc
     frame = _run_and_read(evaluator, tmp_path, monkeypatch)
 
     worker = evaluator.make_evaluation_parallel(
-<<<<<<< HEAD
-        pd.DataFrame(
-            {"ID": ["A"], "use_syear": [2000], "use_eyear": [2001], "sim_lat": [0.0], "sim_lon": [0.0]}
-        ),
-=======
         pd.DataFrame({"ID": ["A"], "use_syear": [2000], "use_eyear": [2001], "sim_lat": [0.0], "sim_lon": [0.0]}),
->>>>>>> upstream/main
         0,
     )
     expected = worker["_overall_nonspatial_numerator"] / worker["_overall_nonspatial_denominator"]
     assert frame.loc[0, "Overall_Score"] == pytest.approx(expected)
+
+
+def test_all_constant_stations_export_nan_overall_and_finite_spatial(tmp_path, monkeypatch):
+    evaluator = _station_evaluator(tmp_path, ["nSpatialScore", "Overall_Score"], {"A": (10.0, 12.0), "B": (20.0, 18.0)})
+    for station_id, level in [("A", 0.0), ("B", 5.0)]:
+        path = tmp_path / "data" / "stn_Ref_Sim" / f"Runoff_ref_{station_id}_2000_2001.nc"
+        with xr.open_dataset(path) as ds:
+            changed = ds.load()
+        changed["flow"][:] = level
+        changed.to_netcdf(path, mode="w")
+    frame = _run_and_read(evaluator, tmp_path, monkeypatch)
+    assert frame.Overall_Score.isna().all()
+    assert np.isfinite(frame.nSpatialScore).all()
 
 
 def test_station_spatial_serial_and_parallel_results_match(tmp_path, monkeypatch):
