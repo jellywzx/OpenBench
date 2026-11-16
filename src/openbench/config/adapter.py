@@ -1109,6 +1109,13 @@ def _restore_drawing_variables(main_nl: dict, ref_nml: dict, sim_nml: dict) -> N
                 candidates = [primary, *(fb["varname"] for fb in fallbacks)]
                 previous = saved.get(role, {}).get(item, {})
                 actual = previous.get(key)
+                if source == "ResOpsUS" and section.get(f"{source}_years_explicit") is False:
+                    for field in ("syear", "eyear"):
+                        if f"{source}_{field}" in previous:
+                            section[f"{source}_{field}"] = previous[f"{source}_{field}"]
+                if previous.get(f"{source}_reservoir_files"):
+                    for field in ("data_type", "reservoir_files", "reservoir_manifest", "station_dim", "station_id_var"):
+                        section[f"{source}_{field}"] = previous[f"{source}_{field}"]
                 if actual is not None:
                     for field in ("model", "data_type", "syear", "eyear"):
                         field_key = f"{source}_{field}"
@@ -1276,6 +1283,10 @@ def build_legacy_namelists(cfg: OpenBenchConfig) -> tuple[dict, dict, dict]:
                     _resolved_vertical_datum(var_map.vertical_datum, ref_ds.root_dir or data_root)
                 )
             # Optional station-related fields
+            for field in ("station_dim", "station_id_var"):
+                value = getattr(var_map, field, None)
+                if value:
+                    section[f"{prefix}_{field}"] = value
             if var_map.fulllist:
                 section[f"{prefix}_fulllist"] = _resolve_root_relative_path(
                     var_map.fulllist,
@@ -1290,6 +1301,28 @@ def build_legacy_namelists(cfg: OpenBenchConfig) -> tuple[dict, dict, dict]:
                 section[f"{prefix}_max_uparea"] = var_map.max_uparea
             if var_map.min_uparea is not None:
                 section[f"{prefix}_min_uparea"] = var_map.min_uparea
+            if resolved_name == "ResOpsUS":
+                section[f"{prefix}_years_explicit"] = bool((source_override or {}).get("years") or var_map.years)
+            if resolved_name == "ResOpsUS" and not cfg.project.only_drawing:
+                from types import SimpleNamespace
+
+                from openbench.data.custom.ResOpsUS_filter import _resolve_station_list
+                from openbench.util.station_ids import read_station_csv
+
+                if not section[f"{prefix}_years_explicit"]:
+                    try:
+                        station_path = _resolve_station_list(SimpleNamespace(
+                            ref_fulllist=section.get(f"{prefix}_fulllist", ""),
+                            ref_dir=ref_dir, sim_grid_res=cfg.project.grid_res,
+                        ))
+                    except (FileNotFoundError, ValueError, TypeError):
+                        station_path = None  # Runtime reports missing lists with the source context.
+                    if station_path:
+                        rows = read_station_csv(station_path)
+                        start_key = "ref_syear" if "ref_syear" in rows else "SYEAR"
+                        end_key = "ref_eyear" if "ref_eyear" in rows else "EYEAR"
+                        section[f"{prefix}_syear"] = int(rows[start_key].min())
+                        section[f"{prefix}_eyear"] = int(rows[end_key].max())
         else:
             if r.message:
                 logger.warning("Reference resolution: %s", r.message)
@@ -1436,6 +1469,11 @@ def build_legacy_namelists(cfg: OpenBenchConfig) -> tuple[dict, dict, dict]:
                 var_section[f"{prefix}_prefix_fallback"] = pf
             var_section[f"{prefix}_timezone"] = inline_vars.get("timezone", 0)
 
+            for field in ("station_dim", "station_id_var"):
+                value = inline_vars.get(field, getattr(profile_var, field, None))
+                if value:
+                    var_section[f"{prefix}_{field}"] = value
+
             # Optional station-related fields: inline config > entry-level > model profile
             if "fulllist" in inline_vars:
                 var_section[f"{prefix}_fulllist"] = inline_vars["fulllist"]
@@ -1453,5 +1491,9 @@ def build_legacy_namelists(cfg: OpenBenchConfig) -> tuple[dict, dict, dict]:
 
     if cfg.project.only_drawing:
         _restore_drawing_variables(main_nl, ref_nml, sim_nml)
+    else:
+        from openbench.data.reservoir import resolve_reservoir_namelists
+
+        resolve_reservoir_namelists(cfg, ref_nml, sim_nml)
 
     return main_nl, ref_nml, sim_nml

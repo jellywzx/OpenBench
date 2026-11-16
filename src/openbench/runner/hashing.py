@@ -116,6 +116,8 @@ STATION_ALGORITHM_SOURCE_MODULES = (
     "openbench.data._processing_station_core",
     "openbench.data._processing_station_extract",
     "openbench.data.station_matcher",
+    "openbench.data.reservoir",
+    "openbench.data.custom.ResOpsUS_filter",
     "openbench.data.station_missing",
     "openbench.data.station_scanner",
 )

@@ -224,6 +224,8 @@ class GeneralInfoReader:
                 "syear",
                 "eyear",
                 "convert",
+                "station_dim",
+                "station_id_var",
             ]
             # Preserve native numeric types for attributes used arithmetically
             # downstream (year ranges, grid resolution). Coercing them to str
@@ -258,7 +260,7 @@ class GeneralInfoReader:
                         ref_has_filter = (
                             not item_is_matched and source_type == "ref" and self._get_custom_filter() is not None
                         )
-                        if not (item_is_matched or ref_has_filter):
+                        if not (item_is_matched or ref_has_filter or nml[item].get(f"{source}_reservoir_files")):
                             logging.error("read %s_fulllist namelist error: %s", source_type, e2)
 
             # Handle uparea attributes for station data
@@ -377,6 +379,16 @@ class GeneralInfoReader:
         """Process station data if applicable."""
 
         if self.ref_data_type == "stn" or self.sim_data_type == "stn":
+            if getattr(self, "only_drawing", False) and getattr(self, f"{self.sim_source}_reservoir_files", None):
+                from pathlib import Path
+
+                saved_list = Path(self.casedir) / f"stn_{self.ref_source}_{self.sim_source}_list.txt"
+                self.stn_list = read_station_csv(saved_list)
+                self.stn_info = self.stn_list
+                self.ref_fulllist = str(saved_list)
+                self.use_syear = int(self.stn_list.use_syear.min())
+                self.use_eyear = int(self.stn_list.use_eyear.max())
+                return
             try:
                 self._read_and_merge_station_lists()
             except Exception as e:
@@ -554,6 +566,9 @@ class GeneralInfoReader:
             resolved = os.path.normpath(os.path.join(csv_dir, p))
             if os.path.exists(resolved):
                 return resolved
+            # Try the source root before the historical basename fallback.
+            if root_dir and os.path.isfile(os.path.join(root_dir, p)):
+                return os.path.normpath(os.path.join(root_dir, p))
             # Try 2: root_dir + basename
             if root_dir:
                 resolved2 = os.path.join(root_dir, os.path.basename(p))
@@ -662,7 +677,7 @@ class GeneralInfoReader:
                 # The built-in station matcher enforces fixed upstream-area and
                 # allocation-error limits; falling back would evaluate stations
                 # it rejected (or a station list it never vetted).
-                if getattr(custom_filter, "is_station_matcher", False):
+                if getattr(custom_filter, "is_station_matcher", False) or self.ref_source == "ResOpsUS":
                     raise
                 logging.error(f"Custom filter failed: {e}")
                 self._apply_default_filter()

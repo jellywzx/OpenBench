@@ -56,6 +56,8 @@ class VariableMapping:
     prefix_fallback: Optional[list[str]] = None  # Alternative file prefix suffixes, e.g., ["_cama_", "_unitcat_"]
     years: Optional[list[int]] = None  # Reference-only coverage; defaults to dataset years.
 
+    station_dim: Optional[str] = None
+    station_id_var: Optional[str] = None
     vertical_datum: Optional[dict] = None
 
     def __post_init__(self):
@@ -67,6 +69,9 @@ class VariableMapping:
 
     def to_dict(self) -> dict:
         d: dict = {"varname": self.varname, "varunit": self.varunit}
+        for key in ("station_dim", "station_id_var"):
+            if getattr(self, key):
+                d[key] = getattr(self, key)
         if self.vertical_datum is not None:
             d["vertical_datum"] = dict(self.vertical_datum)
         if self.prefix:
