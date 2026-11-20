@@ -766,7 +766,29 @@ def _reference_metadata_findings(
     errors.extend(tz_errors)
     warnings.extend(tz_warnings)
 
-    year_errors, year_warnings = _years_findings(ref_name, reference_years(ref_ds, _var_map), cfg.project.years)
+    years = reference_years(ref_ds, _var_map)
+    override = getattr(cfg.reference, "overrides", {}).get(ref_name, {})
+    if ref_name == "ResOpsUS" and not (override.get("years") or getattr(_var_map, "years", None)) and file_checks:
+        from types import SimpleNamespace
+
+        from openbench.config.adapter import _resolve_root_relative_path
+        from openbench.data.custom.ResOpsUS_filter import _resolve_station_list
+
+        fulllist = getattr(_var_map, "fulllist", None) or ref_ds.fulllist
+        if fulllist:
+            fulllist = _resolve_root_relative_path(fulllist, _root)
+        try:
+            path = _resolve_station_list(
+                SimpleNamespace(
+                    ref_dir=_directory,
+                    ref_fulllist=fulllist,
+                    sim_grid_res=cfg.project.grid_res,
+                )
+            )
+            years = _station_year_span(str(path), _root, years, side="ref")
+        except (OSError, ValueError, TypeError):
+            pass  # The reference list/runtime checks report the path error.
+    year_errors, year_warnings = _years_findings(ref_name, years, cfg.project.years)
     errors.extend(year_errors)
     warnings.extend(year_warnings)
 
@@ -1142,6 +1164,22 @@ def check(config, comparison_only=False, strict_reference=False, variables=()):
     )
 
     has_errors = False
+    if not comparison_only and not cfg.project.only_drawing:
+        from openbench.data.reservoir import ITEMS
+
+        if ITEMS.intersection(cfg.evaluation.variables):
+            from openbench.config.adapter import build_legacy_namelists
+
+            try:
+                _, _, effective_sims = build_legacy_namelists(cfg)
+                for item in ITEMS.intersection(cfg.evaluation.variables):
+                    section = effective_sims.get(item, {})
+                    for label in cfg.simulation:
+                        if section.get(f"{label}_reservoir_files"):
+                            click.secho(f"  ✓ {item}/{label}: reservoir → station, exact GRanD ID matching", fg="green")
+            except (OSError, ValueError, KeyError) as exc:
+                click.secho(f"  ✗ Reservoir inputs: {exc}", fg="red")
+                has_errors = True
     config_errors, config_warnings = _config_findings(cfg)
     for message in config_errors:
         click.secho(f"  ✗ {message}", fg="red")

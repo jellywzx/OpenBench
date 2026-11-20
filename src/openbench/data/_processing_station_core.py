@@ -96,6 +96,12 @@ class StationProcessingCoreMixin:
             if not hasattr(self, "station_list") or self.station_list is None or self.station_list.empty:
                 raise RuntimeError("Station list is empty; cannot process station data")
 
+            if data_params["datasource"] == "sim" and getattr(self, f"{self.sim_source}_reservoir_files", None):
+                from openbench.data.reservoir import process_reservoir_source
+
+                process_reservoir_source(self)
+                return
+
             indices = list(range(len(self.station_list["ID"])))
             self._remove_stale_station_temp_files(data_params["datasource"])
             try:
@@ -185,6 +191,11 @@ class StationProcessingCoreMixin:
             except AttributeError:
                 source_name = source_key
             actual_station_var = get_xarray_key_case_insensitive(stn_data, current_var_list[0])
+            if datasource == "ref" and self.ref_source == "ResOpsUS" and actual_station_var is not None:
+                from openbench.data.reservoir import ITEMS, reservoir_unit
+
+                if self.item in ITEMS:
+                    self.ref_varunit = reservoir_unit(stn_data[actual_station_var].attrs.get("units", ""), self.item)
             if actual_station_var is None:
                 # Same priority: runtime fallback → compute → filter → direct
                 runtime_fallback_used = False
@@ -428,10 +439,10 @@ class StationProcessingCoreMixin:
         if station_dim is None:
             return stn_data
 
-        if stn_data.sizes.get(station_dim, 0) <= 1:
+        if stn_data.sizes.get(station_dim, 0) <= 1 and not getattr(self, f"{datasource}_station_id_var", None):
             return stn_data.isel({station_dim: 0}, drop=True)
 
-        index = self._merged_station_index(stn_data, station_dim, station_id)
+        index = self._merged_station_index(stn_data, station_dim, station_id, datasource)
         if index is None:
             raise ValueError(f"Station {station_id} not found in merged station file")
         return stn_data.isel({station_dim: index}, drop=True)
@@ -441,7 +452,10 @@ class StationProcessingCoreMixin:
         var_names = list(var_attr) if isinstance(var_attr, list) else [var_attr]
         configured_var = var_names[0] if var_names else None
         actual_var = get_xarray_key_case_insensitive(stn_data, configured_var) if configured_var else None
-        candidate_dims = [dim for dim in stn_data.dims if str(dim).lower() in _MERGED_STATION_DIMS]
+        explicit_dim = getattr(self, f"{datasource}_station_dim", None)
+        candidate_dims = [
+            dim for dim in stn_data.dims if str(dim).lower() in _MERGED_STATION_DIMS or dim == explicit_dim
+        ]
 
         if actual_var is not None:
             var_dims = set(stn_data[actual_var].dims)
@@ -454,9 +468,12 @@ class StationProcessingCoreMixin:
                     return dim
         return None
 
-    def _merged_station_index(self, stn_data: xr.Dataset, station_dim: str, station_id: str) -> int | None:
+    def _merged_station_index(
+        self, stn_data: xr.Dataset, station_dim: str, station_id: str, datasource: str | None = None
+    ) -> int | None:
         wanted = station_id_key(station_id)
-        for name in _MERGED_STATION_ID_VARS:
+        explicit_id = getattr(self, f"{datasource}_station_id_var", None) if datasource else None
+        for name in (explicit_id,) if explicit_id else _MERGED_STATION_ID_VARS:
             actual_name = get_xarray_key_case_insensitive(stn_data, name)
             if actual_name is None:
                 continue
@@ -468,7 +485,7 @@ class StationProcessingCoreMixin:
                 if station_id_key(_station_value_to_string(station_value)) == wanted:
                     return index
 
-        if station_dim in stn_data.coords:
+        if not explicit_id and station_dim in stn_data.coords:
             for index, value in enumerate(stn_data[station_dim].values):
                 if station_id_key(_station_value_to_string(value)) == wanted:
                     return index

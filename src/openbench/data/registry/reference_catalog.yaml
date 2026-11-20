@@ -3022,15 +3022,16 @@ R_ArcticNet_Monthly:
 ResOpsUS:
   name: ResOpsUS
   description: ResOpsUS reference dataset (Station)
-  category: Urban
+  category: Water
   data_type: stn
   tim_res: Day
   data_groupby: single
   timezone: 0
-  root_dir: ${OPENBENCH_REF_ROOT}/Station
+  root_dir: ${OPENBENCH_REF_ROOT}/Station/Anth/Dam/ResOpsUS
+  # Coverage envelope of the station lists; individual station windows still apply.
   years:
-  - 1908
-  - 1957
+  - 1869
+  - 2021
   variables:
     Dam_Inflow:
       varname: inflow

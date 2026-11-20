@@ -685,3 +685,5 @@ OpenBench source code is MIT licensed. See [LICENSE](LICENSE) for details.
 Bundled third-party colormap resources keep their upstream terms: the vendored
 `cmaps` code is GPL-3.0-only, and the NCL color tables are covered by the
 included NCL source license file.
+
+CoLM 水库向量输出与 ResOpsUS 的原生接入、ID 匹配和配置示例见 [水库评估说明](docs/manual/reservoir_evaluation.md)。

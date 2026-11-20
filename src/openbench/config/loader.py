@@ -136,6 +136,8 @@ _VARIABLE_OVERRIDE_KEYS = {
     "compute",
     "accumulated",
     "prefix_fallback",
+    "station_dim",
+    "station_id_var",
 }
 
 
@@ -567,6 +569,10 @@ def _validated_variables_mapping(raw: Any, path: str, *, reference: bool = False
             )
         allowed = _VARIABLE_OVERRIDE_KEYS | {"years", "vertical_datum"} if reference else _VARIABLE_OVERRIDE_KEYS
         _reject_unknown_keys(override, allowed, f"{path}.{var_name}")
+        for field in ("station_dim", "station_id_var"):
+            value = override.get(field)
+            if field in override and (not isinstance(value, str) or not value.strip()):
+                raise ConfigError(f"{path}.{var_name}.{field} must be a non-empty string")
         # A null variable window clears the catalog binding and inherits its dataset window.
         if "years" in override and override["years"] is not None:
             _validate_years(override["years"], f"{path}.{var_name}.years")

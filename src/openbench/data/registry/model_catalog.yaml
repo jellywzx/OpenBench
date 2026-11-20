@@ -1213,6 +1213,8 @@ CoLM2024:
       varname: Crop_Yield_Wheat
       varunit: t ha-1
     Dam_Inflow:
+      station_dim: reservoir
+      station_id_var: resv_GRAND_ID
       fallbacks:
         - varname: qresv_in
           varunit: m3 s-1
@@ -1222,6 +1224,8 @@ CoLM2024:
       varname: daminf
       varunit: m3 s-1
     Dam_Outflow:
+      station_dim: reservoir
+      station_id_var: resv_GRAND_ID
       fallbacks:
         - varname: qresv_out
           varunit: m3 s-1
@@ -1252,6 +1256,8 @@ CoLM2024:
       varname: sfcelv
       varunit: m
     Dam_Water_Storage:
+      station_dim: reservoir
+      station_id_var: resv_GRAND_ID
       fallbacks:
         - varname: volresv
           varunit: m3

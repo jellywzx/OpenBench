@@ -923,6 +923,8 @@ def model_snapshot_overlay(profile: ModelProfile, bundled: ModelProfile | None =
             "compute",
             "accumulated",
             "prefix_fallback",
+            "station_dim",
+            "station_id_var",
             "vertical_datum",
         ):
             data.setdefault(key, getattr(mapping, key))
@@ -1072,6 +1074,8 @@ def _build_reference(data: dict) -> ReferenceDataset:
                 compute=var_data.get("compute"),
                 accumulated=var_data.get("accumulated"),
                 prefix_fallback=var_data.get("prefix_fallback"),
+                station_dim=var_data.get("station_dim"),
+                station_id_var=var_data.get("station_id_var"),
                 vertical_datum=var_data.get("vertical_datum"),
                 years=var_data.get("years"),
             ),
@@ -1139,6 +1143,8 @@ def _build_model(data: dict) -> ModelProfile:
                 compute=var_data.get("compute"),
                 accumulated=var_data.get("accumulated"),
                 prefix_fallback=var_data.get("prefix_fallback"),
+                station_dim=var_data.get("station_dim"),
+                station_id_var=var_data.get("station_id_var"),
                 vertical_datum=var_data.get("vertical_datum"),
             ),
         )
@@ -1230,6 +1236,8 @@ def _merge_variable_mapping(
         "compute": merged.get("compute"),
         "accumulated": merged.get("accumulated"),
         "prefix_fallback": merged.get("prefix_fallback"),
+        "station_dim": merged.get("station_dim"),
+        "station_id_var": merged.get("station_id_var"),
         "vertical_datum": merged.get("vertical_datum"),
     }
     if include_reference_fields:
