@@ -471,6 +471,23 @@ automatically (PNG, with the underlying data saved alongside):
 - **Single Model Performance Index (SMPI)**, **Mann–Kendall trend**,
   **three-cornered hat**, **functional response**, **PLSR**
 
+Enable `Diff_Kernel_Density_Estimate` in `comparison.items` to render KDEs of
+pairwise gridded differences. The runner executes `Diff_Plot` first, then saves
+Diff KDE figures under `comparisons/Diff_Kernel_Density_Estimate/`. Ordinary KDE
+figures remain under `comparisons/Kernel_Density_Estimate/`; Diff Plot data remain
+under `comparisons/Diff_Plot/`. CLI, GUI, and `only_drawing` use the same Diff KDE
+output directory and existing KDE plotting configuration. Existing figures in
+the former mixed KDE directory are left in place.
+
+To render existing gridded difference files independently, run from the repository
+with OpenBench installed:
+
+```bash
+python scripts/plot_diff_kde.py output/<project_name>/comparisons/Diff_Plot/*__diff.nc
+# Override the default comparisons/Diff_Kernel_Density_Estimate/ destination:
+python scripts/plot_diff_kde.py path/to/pairwise__diff.nc --output-dir path/to/figures
+```
+
 ## Classification Group-By (IGBP / PFT / Köppen)
 
 OpenBench can aggregate scores per land-cover or climate class. Enable any of:

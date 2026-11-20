@@ -39,9 +39,7 @@ def test_metadata_reader_loads_only_station_dimension(tmp_path: Path, monkeypatc
         return original(array)
 
     monkeypatch.setattr(xr.DataArray, "values", property(guarded_values))
-    result = read_reference_station_metadata(
-        path, variable="Suspended_Sediment_Concentration", grid_resolution=0.25
-    )
+    result = read_reference_station_metadata(path, variable="Suspended_Sediment_Concentration", grid_resolution=0.25)
 
     assert result["station_id"].tolist() == ["0007", "B"]
     assert result["station_name"].tolist() == ["Alpha", "Beta"]

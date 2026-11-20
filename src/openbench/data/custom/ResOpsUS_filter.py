@@ -83,7 +83,7 @@ def filter_ResOpsUS(info, ds=None):
     df.rename(columns={key: val for key, val in rename.items() if val not in df}, inplace=True)
     required = set(rename.values())
     if not required <= set(df):
-        raise ValueError(f"ResOpsUS station list missing columns: {sorted(required-set(df))}")
+        raise ValueError(f"ResOpsUS station list missing columns: {sorted(required - set(df))}")
     for col in ("ref_syear", "ref_eyear", "ref_lon", "ref_lat"):
         df[col] = pd.to_numeric(df[col], errors="raise")
     if (df.ref_syear > df.ref_eyear).any():
@@ -96,14 +96,20 @@ def filter_ResOpsUS(info, ds=None):
     GeneralInfoReader._resolve_relative_paths(df, "ref_dir", str(station_list_path), info.ref_dir)
     df["use_syear"] = df.ref_syear.clip(lower=max(int(info.sim_syear), int(info.syear), int(info.ref_syear)))
     df["use_eyear"] = df.ref_eyear.clip(upper=min(int(info.sim_eyear), int(info.eyear), int(info.ref_eyear)))
-    selected = (df.Flag & ((df.use_eyear-df.use_syear) >= info.min_year)
-                & df.ref_lat.between(info.min_lat, info.max_lat) & df.ref_lon.between(info.min_lon, info.max_lon))
+    selected = (
+        df.Flag
+        & ((df.use_eyear - df.use_syear) >= info.min_year)
+        & df.ref_lat.between(info.min_lat, info.max_lat)
+        & df.ref_lon.between(info.min_lon, info.max_lon)
+    )
     df = df[selected].copy()
     if df.empty:
         raise ValueError("No ResOpsUS stations selected in the requested region/years")
     for path in df.ref_dir:
         if not Path(path).is_file():
-            raise FileNotFoundError(f"ResOpsUS observation not found: {path}; check DIR relative to {station_list_path} or {info.ref_dir}")
+            raise FileNotFoundError(
+                f"ResOpsUS observation not found: {path}; check DIR relative to {station_list_path} or {info.ref_dir}"
+            )
     if getattr(info, f"{info.sim_source}_reservoir_manifest", None):
         df = match_reservoir_stations(info, df)
     elif getattr(info, "sim_data_type", "grid") == "stn":
@@ -118,7 +124,7 @@ def filter_ResOpsUS(info, ds=None):
         df = merge_on_station_id(sim, df, suffixes=("_simdup", ""))
         df["use_syear"] = df[["sim_syear", "use_syear"]].max(axis=1).astype(int)
         df["use_eyear"] = df[["sim_eyear", "use_eyear"]].min(axis=1).astype(int)
-        df = df[(df.use_eyear-df.use_syear) >= info.min_year].copy()
+        df = df[(df.use_eyear - df.use_syear) >= info.min_year].copy()
         if df.empty:
             raise ValueError("No shared ResOpsUS station IDs/years")
     info.stn_list = df

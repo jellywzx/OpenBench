@@ -461,8 +461,7 @@ def test_check_month_target_requires_literal_month_reference(
 
     assert result.exit_code == expected_exit_code, result.output
     message = (
-        f"Reference 'DemoRef' time resolution {ref_tim_res} is incompatible with target Month; "
-        "expected exactly Month"
+        f"Reference 'DemoRef' time resolution {ref_tim_res} is incompatible with target Month; expected exactly Month"
     )
     if expected_exit_code:
         assert message in result.output

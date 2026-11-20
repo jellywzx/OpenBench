@@ -473,7 +473,7 @@ class StationProcessingCoreMixin:
     ) -> int | None:
         wanted = station_id_key(station_id)
         explicit_id = getattr(self, f"{datasource}_station_id_var", None) if datasource else None
-        for name in ((explicit_id,) if explicit_id else _MERGED_STATION_ID_VARS):
+        for name in (explicit_id,) if explicit_id else _MERGED_STATION_ID_VARS:
             actual_name = get_xarray_key_case_insensitive(stn_data, name)
             if actual_name is None:
                 continue

@@ -53,10 +53,7 @@ def _peak_stats_1d(sim, obs, days, threshold_quantile, separation_days, window_d
             [
                 i
                 for i in indices
-                if i > 0
-                and i < len(days) - 1
-                and days[i] - days[i - 1] <= 1.5
-                and days[i + 1] - days[i] <= 1.5
+                if i > 0 and i < len(days) - 1 and days[i] - days[i - 1] <= 1.5 and days[i + 1] - days[i] <= 1.5
             ],
             dtype=int,
         )
@@ -77,9 +74,7 @@ def _peak_stats_1d(sim, obs, days, threshold_quantile, separation_days, window_d
     used = set()
     errors = []
     for idx in independent:
-        nearby = [
-            int(j) for j in model_peaks if int(j) not in used and abs(days[j] - days[idx]) <= window_days
-        ]
+        nearby = [int(j) for j in model_peaks if int(j) not in used and abs(days[j] - days[idx]) <= window_days]
         if not nearby:
             continue
         # Largest local crest best represents the flood event; tie-break by
@@ -205,4 +200,3 @@ def inundation_spatial_csi(sim: xr.DataArray, obs: xr.DataArray, threshold: floa
             "valid_weight": valid_weight,
         }
     )
-

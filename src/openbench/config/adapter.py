@@ -1114,7 +1114,13 @@ def _restore_drawing_variables(main_nl: dict, ref_nml: dict, sim_nml: dict) -> N
                         if f"{source}_{field}" in previous:
                             section[f"{source}_{field}"] = previous[f"{source}_{field}"]
                 if previous.get(f"{source}_reservoir_files"):
-                    for field in ("data_type", "reservoir_files", "reservoir_manifest", "station_dim", "station_id_var"):
+                    for field in (
+                        "data_type",
+                        "reservoir_files",
+                        "reservoir_manifest",
+                        "station_dim",
+                        "station_id_var",
+                    ):
                         section[f"{source}_{field}"] = previous[f"{source}_{field}"]
                 if actual is not None:
                     for field in ("model", "data_type", "syear", "eyear"):
@@ -1311,10 +1317,13 @@ def build_legacy_namelists(cfg: OpenBenchConfig) -> tuple[dict, dict, dict]:
 
                 if not section[f"{prefix}_years_explicit"]:
                     try:
-                        station_path = _resolve_station_list(SimpleNamespace(
-                            ref_fulllist=section.get(f"{prefix}_fulllist", ""),
-                            ref_dir=ref_dir, sim_grid_res=cfg.project.grid_res,
-                        ))
+                        station_path = _resolve_station_list(
+                            SimpleNamespace(
+                                ref_fulllist=section.get(f"{prefix}_fulllist", ""),
+                                ref_dir=ref_dir,
+                                sim_grid_res=cfg.project.grid_res,
+                            )
+                        )
                     except (FileNotFoundError, ValueError, TypeError):
                         station_path = None  # Runtime reports missing lists with the source context.
                     if station_path:

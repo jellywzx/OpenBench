@@ -7,6 +7,9 @@ import pytest
 import xarray as xr
 from scripts import plot_diff_kde
 
+from openbench.core import _comparison_diff_plot as diff_kde
+from openbench.core import comparison
+
 FILENAME = "Runoff__ref__RefA__Sim_A__vs__Sim_B__Overall_Score__diff.nc"
 
 
@@ -25,7 +28,7 @@ def _write_diff(path: Path, values=None, *, attrs=None, variable_attrs=None, var
 
 
 def test_parse_standard_diff_filename():
-    metadata = plot_diff_kde.parse_diff_filename(Path(FILENAME))
+    metadata = diff_kde.parse_diff_filename(Path(FILENAME))
 
     assert metadata.evaluation_item == "Runoff"
     assert metadata.ref_source == "RefA"
@@ -41,15 +44,15 @@ def test_plot_diff_file_filters_values_and_calls_openbench_renderer(tmp_path, mo
     path = _write_diff(diff_dir / FILENAME)
     calls = []
     monkeypatch.setattr(
-        plot_diff_kde,
+        comparison,
         "make_scenarios_comparison_Kernel_Density_Estimate",
         lambda *args: calls.append(args),
     )
 
-    output = plot_diff_kde.plot_diff_file(path)
+    output = diff_kde.plot_diff_file(path)
 
     basedir, item, ref, simulations, variable, datasets, option = calls[0]
-    assert Path(basedir) == tmp_path / "comparisons" / "Kernel_Density_Estimate"
+    assert Path(basedir) == tmp_path / "comparisons" / "Diff_Kernel_Density_Estimate"
     assert (item, ref, simulations, variable) == (
         "Runoff",
         "RefA",
@@ -89,41 +92,65 @@ def test_main_processes_multiple_inputs_and_reports_partial_failure(tmp_path, mo
 )
 def test_rejects_nonstandard_diff_filenames(filename):
     with pytest.raises(ValueError, match="pairwise diff filename"):
-        plot_diff_kde.parse_diff_filename(Path(filename))
+        diff_kde.parse_diff_filename(Path(filename))
 
 
 def test_rejects_missing_variable(tmp_path):
     path = _write_diff(tmp_path / FILENAME, variable="Other_diff")
-    metadata = plot_diff_kde.parse_diff_filename(path)
+    metadata = diff_kde.parse_diff_filename(path)
 
     with pytest.raises(ValueError, match="missing variable 'Overall_Score_diff'"):
-        plot_diff_kde.read_diff_values(path, metadata)
+        diff_kde.read_diff_values(path, metadata)
 
 
 def test_rejects_conflicting_metadata(tmp_path):
     path = _write_diff(tmp_path / FILENAME, variable_attrs={"item": "NotRunoff"})
-    metadata = plot_diff_kde.parse_diff_filename(path)
+    metadata = diff_kde.parse_diff_filename(path)
 
     with pytest.raises(ValueError, match="conflicts with filename"):
-        plot_diff_kde.read_diff_values(path, metadata)
+        diff_kde.read_diff_values(path, metadata)
 
 
 @pytest.mark.parametrize("values", [[[np.nan, np.nan]], [[1.0, 1.0]]])
 def test_rejects_data_that_cannot_form_kde(tmp_path, values):
     path = _write_diff(tmp_path / FILENAME, values=values)
-    metadata = plot_diff_kde.parse_diff_filename(path)
+    metadata = diff_kde.parse_diff_filename(path)
 
     with pytest.raises(ValueError, match="KDE requires"):
-        plot_diff_kde.read_diff_values(path, metadata)
+        diff_kde.read_diff_values(path, metadata)
 
 
-def test_real_renderer_creates_jpg(tmp_path):
+@pytest.mark.parametrize("custom_output", [False, True])
+def test_real_renderer_creates_jpg(tmp_path, custom_output):
     rng = np.random.default_rng(42)
     diff_dir = tmp_path / "comparisons" / "Diff_Plot"
     diff_dir.mkdir(parents=True)
     path = _write_diff(diff_dir / FILENAME, values=rng.normal(size=(10, 10)))
 
-    output = plot_diff_kde.plot_diff_file(path)
+    original_data = path.read_bytes()
+    old_dir = tmp_path / "comparisons" / "Kernel_Density_Estimate"
+    old_dir.mkdir()
+    old_figure = old_dir / "existing.jpg"
+    old_figure.write_bytes(b"existing experiment figure")
+    destination = tmp_path / "custom" if custom_output else diff_dir.parent / "Diff_Kernel_Density_Estimate"
+    if custom_output:
+        # A custom destination also permits inputs outside a Diff_Plot directory.
+        moved_path = tmp_path / FILENAME
+        path.rename(moved_path)
+        path = moved_path
+    args = [str(path)]
+    if custom_output:
+        args.extend(["--output-dir", str(destination)])
 
+    assert plot_diff_kde.main(args) == 0
+    output = diff_kde.expected_output_path(
+        destination,
+        diff_kde.parse_diff_filename(path),
+        diff_kde.build_fig_nml()["Comparison"]["Diff_Kernel_Density_Estimate"],
+    )
+
+    assert path.read_bytes() == original_data
+    assert list(old_dir.iterdir()) == [old_figure]
+    assert old_figure.read_bytes() == b"existing experiment figure"
     assert output.is_file()
     assert output.suffix == ".jpg"

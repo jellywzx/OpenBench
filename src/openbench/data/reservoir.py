@@ -3,6 +3,7 @@
 Layout discovery reads headers/IDs only. Values are selected by identity in each
 file before concatenation; array positions are never identities across files.
 """
+
 from __future__ import annotations
 
 import json
@@ -65,10 +66,14 @@ def _discover(section, label, years, item):
     candidates = list(dict.fromkeys([get("varname"), *(fb["varname"] for fb in get("fallbacks", []))]))
     paths = []
     missing_years = []
-    for year in ([None] if grouping == "single" else range(years[0], years[1] + 1)):
+    for year in [None] if grouping == "single" else range(years[0], years[1] + 1):
         found, _ = select_data_files(
-            get("dir"), get("prefix") or "", get("suffix") or "", year,
-            prefix_fallback=get("prefix_fallback"), candidate_varnames=candidates,
+            get("dir"),
+            get("prefix") or "",
+            get("suffix") or "",
+            year,
+            prefix_fallback=get("prefix_fallback"),
+            candidate_varnames=candidates,
         )
         if not found:
             missing_years.append(year)
@@ -79,8 +84,10 @@ def _discover(section, label, years, item):
     for path in paths:
         with xr.open_dataset(path) as ds:
             names = {str(name).casefold(): name for name in ds.data_vars}
-            name = next((names[str(candidate).casefold()] for candidate in candidates
-                         if str(candidate).casefold() in names), None)
+            name = next(
+                (names[str(candidate).casefold()] for candidate in candidates if str(candidate).casefold() in names),
+                None,
+            )
             if name is None:
                 kinds.add("missing")
                 if dim in ds.dims:
@@ -104,11 +111,19 @@ def _discover(section, label, years, item):
             previous_end = index[-1]
             common = set(mapping) if common is None else common & set(mapping)
             stat = Path(path).stat()
-            files.append(dict(path=str(Path(path).resolve()), variable=name, unit=unit,
-                              size=stat.st_size, mtime_ns=stat.st_mtime_ns))
+            files.append(
+                dict(
+                    path=str(Path(path).resolve()),
+                    variable=name,
+                    unit=unit,
+                    size=stat.st_size,
+                    mtime_ns=stat.st_mtime_ns,
+                )
+            )
             match = re.search(r"(?<!\d)(\d{4})[-_](\d{2})(?!\d)", Path(path).name)
-            months.append((int(match[1]), int(match[2])) if match else
-                          (int(ds.time.dt.year[0]), int(ds.time.dt.month[0])))
+            months.append(
+                (int(match[1]), int(match[2])) if match else (int(ds.time.dt.year[0]), int(ds.time.dt.month[0]))
+            )
     if "reservoir" not in kinds:
         return None
     if kinds != {"reservoir"}:
@@ -118,17 +133,26 @@ def _discover(section, label, years, item):
     if grouping == "month":
         expected = {(year, month) for year in range(years[0], years[1] + 1) for month in range(1, 13)}
         if set(months) != expected or len(months) != len(expected):
-            raise ValueError(f"{label}: missing or duplicate monthly reservoir files: {sorted(expected-set(months))}")
+            raise ValueError(f"{label}: missing or duplicate monthly reservoir files: {sorted(expected - set(months))}")
     units = {entry["unit"] for entry in files}
     if len(units) != 1:
         raise ValueError(f"{label}: reservoir units change between files: {units}")
     from openbench.data.registry.manager import get_registry
 
     profile = get_registry().get_model(get("model"))
-    return dict(files=files, ids=sorted(common, key=int), station_dim=dim, station_id_var=id_var,
-                variable=files[0]["variable"], unit=files[0]["unit"], item=item,
-                model=get("model"), tim_res=get("tim_res"), years=list(years),
-                time_offset=profile.time_offset if profile else {})
+    return dict(
+        files=files,
+        ids=sorted(common, key=int),
+        station_dim=dim,
+        station_id_var=id_var,
+        variable=files[0]["variable"],
+        unit=files[0]["unit"],
+        item=item,
+        model=get("model"),
+        tim_res=get("tim_res"),
+        years=list(years),
+        time_offset=profile.time_offset if profile else {},
+    )
 
 
 def resolve_reservoir_namelists(cfg, ref_nml, sim_nml):
@@ -154,15 +178,21 @@ def resolve_reservoir_namelists(cfg, ref_nml, sim_nml):
         if not common:
             raise ValueError(f"{item}: no common reservoir IDs across selected simulations/months")
         manifest = json.dumps(
-            dict(version=1, item=item, common_ids=sorted(common, key=int), sources=layouts), sort_keys=True,
+            dict(version=1, item=item, common_ids=sorted(common, key=int), sources=layouts),
+            sort_keys=True,
         )
         for label, layout in layouts.items():
-            section.update({f"{label}_data_type": "stn", f"{label}_varname": layout["variable"],
-                            f"{label}_varunit": layout["unit"],
-                            f"{label}_station_dim": layout["station_dim"],
-                            f"{label}_station_id_var": layout["station_id_var"],
-                            f"{label}_reservoir_files": layout["files"],
-                            f"{label}_reservoir_manifest": manifest})
+            section.update(
+                {
+                    f"{label}_data_type": "stn",
+                    f"{label}_varname": layout["variable"],
+                    f"{label}_varunit": layout["unit"],
+                    f"{label}_station_dim": layout["station_dim"],
+                    f"{label}_station_id_var": layout["station_id_var"],
+                    f"{label}_reservoir_files": layout["files"],
+                    f"{label}_reservoir_manifest": manifest,
+                }
+            )
 
 
 def _unchanged(entry):
@@ -176,7 +206,11 @@ def read_reservoir_series(layout, ids, processor=None):
     from openbench.data._processing_time_adjustments import TimeAdjustmentMixin
 
     time_context = processor or SimpleNamespace(
-        sim_source="reservoir", reservoir_model=layout["model"], item=layout["item"], sim_dir="", sim_prefix="",
+        sim_source="reservoir",
+        reservoir_model=layout["model"],
+        item=layout["item"],
+        sim_dir="",
+        sim_prefix="",
     )
     pieces = []
     for entry in layout["files"]:
@@ -197,11 +231,21 @@ def read_reservoir_series(layout, ids, processor=None):
                 data = data.transpose("time", layout["station_dim"]).load()
             values = data.values
             clean = np.where(np.isfinite(values) & ~np.isclose(values, -1e36, rtol=1e-6, atol=0), values, np.nan)
-            data = xr.DataArray(clean, dims=("time", "station"), coords={"time": ds.time.values, "station": ids},
-                                name=layout["variable"], attrs={"units": layout["unit"]})
+            data = xr.DataArray(
+                clean,
+                dims=("time", "station"),
+                coords={"time": ds.time.values, "station": ids},
+                name=layout["variable"],
+                attrs={"units": layout["unit"]},
+            )
             # Finite-data screening and extraction use the same physical time window.
             data = TimeAdjustmentMixin.apply_model_specific_time_adjustment(
-                time_context, data, "sim", layout["years"][0], layout["years"][1], layout["tim_res"],
+                time_context,
+                data,
+                "sim",
+                layout["years"][0],
+                layout["years"][1],
+                layout["tim_res"],
                 source_files=[entry["path"]],
             )
             pieces.append(data)
@@ -247,10 +291,13 @@ def match_reservoir_stations(info, rows):
     selected["sim_dir"] = layout["files"][0]["path"]
     selected["sim_syear"], selected["sim_eyear"] = info.sim_syear, info.sim_eyear
     selected["sim_lon"], selected["sim_lat"] = selected.ref_lon, selected.ref_lat
-    audit = dict(manifest, selected_ids=selected.ID.tolist(),
-                 unmatched_observations=rows.loc[~rows.ID.isin(manifest["common_ids"]), "ID"].tolist(),
-                 all_missing_ids=sorted(set(candidates.ID) - set(valid), key=int),
-                 matching="exact GRanD ID; no spatial fallback")
+    audit = dict(
+        manifest,
+        selected_ids=selected.ID.tolist(),
+        unmatched_observations=rows.loc[~rows.ID.isin(manifest["common_ids"]), "ID"].tolist(),
+        all_missing_ids=sorted(set(candidates.ID) - set(valid), key=int),
+        matching="exact GRanD ID; no spatial fallback",
+    )
     target = Path(info.casedir) / "reservoir_matching" / f"{info.item}_{info.ref_source}_{info.sim_source}.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     write_file_atomic(target, lambda path: Path(path).write_text(json.dumps(audit, indent=2)), suffix=".tmp.json")

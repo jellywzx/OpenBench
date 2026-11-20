@@ -316,13 +316,17 @@ class Evaluation_grid(metrics, scores):
         misses = float(result["miss_weight"].sum().item())
         union = hits + false_alarms + misses
         n_defined = int(np.isfinite(result["CSI_spatial"]).sum().item())
-        summary = pd.DataFrame([{
-            "threshold_fraction": 0.05,
-            "CSI_spatial_pooled": hits / union if union > 0 else np.nan,
-            "CSI_spatial_mean": float(result["CSI_spatial"].mean(skipna=True).item()) if n_defined else np.nan,
-            "n_defined_times": n_defined,
-            "n_total_times": int(result.sizes["time"]),
-        }])
+        summary = pd.DataFrame(
+            [
+                {
+                    "threshold_fraction": 0.05,
+                    "CSI_spatial_pooled": hits / union if union > 0 else np.nan,
+                    "CSI_spatial_mean": float(result["CSI_spatial"].mean(skipna=True).item()) if n_defined else np.nan,
+                    "n_defined_times": n_defined,
+                    "n_total_times": int(result.sizes["time"]),
+                }
+            ]
+        )
         stem = f"{self.item}_ref_{self.ref_source}_sim_{self.sim_source}_Inundation_CSI"
         target_dir = os.path.join(self.casedir, "metrics")
         os.makedirs(target_dir, exist_ok=True)
@@ -1007,14 +1011,21 @@ class Evaluation_stn(metrics, scores):
                     diagnostic_components = []
                     for name in NAMES:
                         values = np.full(len(results), np.nan)
-                        values[valid_indices] = spatial_value if name == "nSpatialScore" else station_list[f"_diagnostic_{name}"]
+                        values[valid_indices] = (
+                            spatial_value if name == "nSpatialScore" else station_list[f"_diagnostic_{name}"]
+                        )
                         diagnostic_components.append(xr.DataArray(values, dims="station"))
                     diagnostic_overall = np.full(len(results), np.nan)
                     diagnostic_overall[valid_indices] = station_list["Overall_Score"]
                     paired = np.zeros(len(results), dtype=bool)
                     paired[valid_indices] = finite
-                    write_diagnostics(self, diagnostic_components, xr.DataArray(diagnostic_overall, dims="station"),
-                                      xr.DataArray(paired, dims="station"), stations=diagnostic_station_ids)
+                    write_diagnostics(
+                        self,
+                        diagnostic_components,
+                        xr.DataArray(diagnostic_overall, dims="station"),
+                        xr.DataArray(paired, dims="station"),
+                        stations=diagnostic_station_ids,
+                    )
 
             internal_columns.extend(f"_diagnostic_{name}" for name in NAMES[:-1])
             station_list = station_list.drop(columns=internal_columns, errors="ignore")

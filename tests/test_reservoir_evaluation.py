@@ -1,4 +1,5 @@
 """Native reservoir histories use the real station preprocessing/evaluation path."""
+
 import json
 from pathlib import Path
 
@@ -14,8 +15,11 @@ from openbench.data.processing import DatasetProcessing
 from openbench.data.registry import manager
 from openbench.data.reservoir import read_reservoir_series, valid_reservoir_ids
 
-BINDINGS = {"Dam_Inflow": ("qresv_in", "inflow"), "Dam_Outflow": ("qresv_out", "outflow"),
-            "Dam_Water_Storage": ("volresv", "storage")}
+BINDINGS = {
+    "Dam_Inflow": ("qresv_in", "inflow"),
+    "Dam_Outflow": ("qresv_out", "outflow"),
+    "Dam_Water_Storage": ("volresv", "storage"),
+}
 
 
 def fixture(tmp_path, monkeypatch, item="Dam_Inflow", monthly=True, sims=1):
@@ -27,16 +31,21 @@ def fixture(tmp_path, monkeypatch, item="Dam_Inflow", monthly=True, sims=1):
     months = range(1, 13) if monthly else [1]
     time = pd.DatetimeIndex([pd.Timestamp(2001, month, day) for month in months for day in (1, 2)])
     native, observed = BINDINGS[item]
+
     def values(station):
         return np.asarray([station + month + day / 10 for month in months for day in (1, 2)])
+
     rows = []
     for station in (101, 202, 303, 404):
         scale = 1e6 if item == "Dam_Water_Storage" else 1
         unit = "million cubic meters" if scale > 1 else "m3 s-1"
-        xr.Dataset({observed: (("time", "lat", "lon"), (values(station)/scale)[:, None, None], {"units": unit})},
-                   coords={"time": time, "lat": [40.], "lon": [-100.]}).to_netcdf(ref / f"{station}.nc")
-        rows.append(dict(ID=f"ResOpsUS_{station}", SYEAR=2001, EYEAR=2001, LAT=40., LON=-100.,
-                         DIR=f"{station}.nc", Flag=1))
+        xr.Dataset(
+            {observed: (("time", "lat", "lon"), (values(station) / scale)[:, None, None], {"units": unit})},
+            coords={"time": time, "lat": [40.0], "lon": [-100.0]},
+        ).to_netcdf(ref / f"{station}.nc")
+        rows.append(
+            dict(ID=f"ResOpsUS_{station}", SYEAR=2001, EYEAR=2001, LAT=40.0, LON=-100.0, DIR=f"{station}.nc", Flag=1)
+        )
     csv = ref / "stations.csv"
     pd.DataFrame(rows).to_csv(csv, index=False)
     simulations = {}
@@ -48,21 +57,42 @@ def fixture(tmp_path, monkeypatch, item="Dam_Inflow", monthly=True, sims=1):
             ids = [101, 202, 303] if month % 2 else [303, 202, 101]
             data = np.asarray([[station + month + day / 10 for station in ids] for day in (1, 2)])
             data[:, ids.index(303)] = -1e36
-            ds = xr.Dataset({native: (("time", "reservoir"), data,
-                                     {"units": "m^3" if item == "Dam_Water_Storage" else "m^3/s"}),
-                             "resv_GRAND_ID": ("reservoir", ids)},
-                            coords={"time": pd.date_range(f"2001-{month:02d}-01T12:00", periods=2)})
+            ds = xr.Dataset(
+                {
+                    native: (("time", "reservoir"), data, {"units": "m^3" if item == "Dam_Water_Storage" else "m^3/s"}),
+                    "resv_GRAND_ID": ("reservoir", ids),
+                },
+                coords={"time": pd.date_range(f"2001-{month:02d}-01T12:00", periods=2)},
+            )
             ds.to_netcdf(directory / (f"case_hist_unitcat_2001-{month:02d}.nc" if monthly else "case_hist_unitcat_.nc"))
-        simulations[label] = SimulationEntry(model="CoLM2024", root_dir=str(directory), data_type="grid",
-                                             tim_res="Day", data_groupby="Month" if monthly else "single",
-                                             prefix="case_hist_unitcat_")
-    cfg = OpenBenchConfig(project=ProjectConfig(name="reservoir", output_dir=str(tmp_path / "output"),
-                          years=[2001, 2001], tim_res="Day", grid_res=0.2, min_year_threshold=0,
-                          num_cores=1, generate_report=False, station_plots=False),
-                          evaluation=EvaluationConfig(variables=[item]),
-                          reference=ReferenceConfig(sources={item: "ResOpsUS"},
-                              overrides={"ResOpsUS": {"root_dir": str(ref), "fulllist": str(csv)}}),
-                          simulation=simulations, metrics=["RMSE", "KGE"], scores=[])
+        simulations[label] = SimulationEntry(
+            model="CoLM2024",
+            root_dir=str(directory),
+            data_type="grid",
+            tim_res="Day",
+            data_groupby="Month" if monthly else "single",
+            prefix="case_hist_unitcat_",
+        )
+    cfg = OpenBenchConfig(
+        project=ProjectConfig(
+            name="reservoir",
+            output_dir=str(tmp_path / "output"),
+            years=[2001, 2001],
+            tim_res="Day",
+            grid_res=0.2,
+            min_year_threshold=0,
+            num_cores=1,
+            generate_report=False,
+            station_plots=False,
+        ),
+        evaluation=EvaluationConfig(variables=[item]),
+        reference=ReferenceConfig(
+            sources={item: "ResOpsUS"}, overrides={"ResOpsUS": {"root_dir": str(ref), "fulllist": str(csv)}}
+        ),
+        simulation=simulations,
+        metrics=["RMSE", "KGE"],
+        scores=[],
+    )
     return cfg
 
 
@@ -72,8 +102,8 @@ def runtime(cfg, main, refs, sims, label="Sim0"):
 
 @pytest.mark.parametrize("item", BINDINGS)
 def test_monthly_histories_reach_station_metrics(tmp_path, monkeypatch, item):
-    from openbench.core.evaluation import Evaluation_stn
     import openbench.core.evaluation as evaluation
+    from openbench.core.evaluation import Evaluation_stn
 
     cfg = fixture(tmp_path, monkeypatch, item, sims=2)
     main, refs, sims = build_legacy_namelists(cfg)
@@ -93,7 +123,7 @@ def test_monthly_histories_reach_station_metrics(tmp_path, monkeypatch, item):
     assert result.ID.tolist() == [101, 202]
     np.testing.assert_allclose(result.RMSE, 0, atol=1e-10)
     np.testing.assert_allclose(result.KGE, 1, atol=1e-10)
-    audit = json.loads(next((Path(info.casedir)/"reservoir_matching").glob("*.json")).read_text())
+    audit = json.loads(next((Path(info.casedir) / "reservoir_matching").glob("*.json")).read_text())
     assert audit["all_missing_ids"] == ["303"]
     assert audit["unmatched_observations"] == ["404"]
     # Rebuilding runtime info must not restore excluded stations.
@@ -106,15 +136,25 @@ def change(path, transform):
     updated.to_netcdf(path, mode="w")
 
 
-@pytest.mark.parametrize("case,match", [("duplicate", "Duplicate"), ("missing_id", "Missing resv"),
-    ("bad_id", "Invalid GRanD"), ("units", "units"), ("time", "increasing and unique"),
-    ("missing_month", "missing or duplicate monthly"), ("missing_variable", "missing reservoir variable")])
+@pytest.mark.parametrize(
+    "case,match",
+    [
+        ("duplicate", "Duplicate"),
+        ("missing_id", "Missing resv"),
+        ("bad_id", "Invalid GRanD"),
+        ("units", "units"),
+        ("time", "increasing and unique"),
+        ("missing_month", "missing or duplicate monthly"),
+        ("missing_variable", "missing reservoir variable"),
+    ],
+)
 def test_invalid_histories_fail_without_spatial_fallback(tmp_path, monkeypatch, case, match):
     cfg = fixture(tmp_path, monkeypatch)
     path = tmp_path / "Sim0/case_hist_unitcat_2001-02.nc"
     if case == "missing_month":
         path.unlink()
     else:
+
         def transform(ds):
             if case == "duplicate":
                 return ds.assign(resv_GRAND_ID=("reservoir", [101, 101, 202]))
@@ -128,6 +168,7 @@ def test_invalid_histories_fail_without_spatial_fallback(tmp_path, monkeypatch, 
                 return ds.rename(qresv_in="other")
             ds.qresv_in.attrs["units"] = "mm/day"
             return ds
+
         change(path, transform)
     with pytest.raises(ValueError, match=match):
         build_legacy_namelists(cfg)
@@ -144,7 +185,7 @@ def test_common_ids_across_simulations_and_months(tmp_path, monkeypatch):
 
 def test_ctl_cannot_be_silently_dropped(tmp_path, monkeypatch):
     cfg = fixture(tmp_path, monkeypatch)
-    cfg.simulation["CTL"] = SimulationEntry(model="CoLM2024", root_dir=str(tmp_path/"absent"), data_groupby="Month")
+    cfg.simulation["CTL"] = SimulationEntry(model="CoLM2024", root_dir=str(tmp_path / "absent"), data_groupby="Month")
     with pytest.raises(ValueError, match="no reservoir output.*CTL"):
         build_legacy_namelists(cfg)
 
@@ -160,8 +201,15 @@ def test_single_file_and_changed_input(tmp_path, monkeypatch):
         read_reservoir_series(layout, ["101"])
 
 
-@pytest.mark.parametrize("case,match", [("duplicate", "Duplicate ResOpsUS"), ("missing_path", "observation not found"),
-                                      ("region", "No ResOpsUS stations"), ("no_ids", "No common GRanD")])
+@pytest.mark.parametrize(
+    "case,match",
+    [
+        ("duplicate", "Duplicate ResOpsUS"),
+        ("missing_path", "observation not found"),
+        ("region", "No ResOpsUS stations"),
+        ("no_ids", "No common GRanD"),
+    ],
+)
 def test_reference_errors_are_fatal(tmp_path, monkeypatch, case, match):
     cfg = fixture(tmp_path, monkeypatch, monthly=False)
     path = tmp_path / "ref/stations.csv"
@@ -183,6 +231,7 @@ def test_reference_errors_are_fatal(tmp_path, monkeypatch, case, match):
 def test_runner_hash_and_drawing_restore(tmp_path, monkeypatch):
     """Exercise task planning, preprocessing, outputs and saved runtime metadata."""
     import shutil
+
     import openbench.core.evaluation as evaluation
     from openbench.runner.local import run_evaluation
 
@@ -196,9 +245,19 @@ def test_runner_hash_and_drawing_restore(tmp_path, monkeypatch):
     # A peer's inputs affect the common roster and therefore both task hashes.
     from openbench.config.adapter import build_runner_bindings
     from openbench.runner.hashing import task_hash_payload
+
     bindings = build_runner_bindings(cfg)
-    kwargs = dict(cfg=cfg, bindings=bindings, var_name="Dam_Inflow", sim_source="Sim0", ref_source="ResOpsUS",
-                  metric_vars=cfg.metrics, score_vars=[], comparison_vars=[], statistic_vars=[])
+    kwargs = dict(
+        cfg=cfg,
+        bindings=bindings,
+        var_name="Dam_Inflow",
+        sim_source="Sim0",
+        ref_source="ResOpsUS",
+        metric_vars=cfg.metrics,
+        score_vars=[],
+        comparison_vars=[],
+        statistic_vars=[],
+    )
     before = task_hash_payload(**kwargs)
     path = tmp_path / "Sim1/case_hist_unitcat_.nc"
     change(path, lambda ds: ds.isel(reservoir=[1, 2]))
@@ -229,7 +288,7 @@ def test_time_offset_uses_actual_file_once(tmp_path, monkeypatch):
     data = read_reservoir_series(layout, ["101"], proc)
     assert pd.Timestamp(data.time.values[0]) == pd.Timestamp("2001-01-01T12:00")
     proc.prepare_source("sim")
-    path = Path(info.casedir)/"data/stn_ResOpsUS_Sim0/Dam_Inflow_sim_101_2001_2001.nc"
+    path = Path(info.casedir) / "data/stn_ResOpsUS_Sim0/Dam_Inflow_sim_101_2001_2001.nc"
     with xr.open_dataset(path) as ds:
         assert pd.Timestamp(ds.time.values[0]) == pd.Timestamp("2001-01-01T12:00")
         np.testing.assert_allclose(ds.qresv_in.values[:2].ravel(), [102.1, 102.2])
@@ -240,8 +299,10 @@ def test_grid_water_variable_keeps_grid_path(tmp_path, monkeypatch):
     path = tmp_path / "Sim0/case_hist_unitcat_.nc"
     with xr.open_dataset(path) as ds:
         times = ds.time.values
-    xr.Dataset({"daminf": (("time", "lat", "lon"), np.ones((2, 1, 1)), {"units": "m3 s-1"})},
-               coords={"time": times, "lat": [40.], "lon": [-100.]}).to_netcdf(path, mode="w")
+    xr.Dataset(
+        {"daminf": (("time", "lat", "lon"), np.ones((2, 1, 1)), {"units": "m3 s-1"})},
+        coords={"time": times, "lat": [40.0], "lon": [-100.0]},
+    ).to_netcdf(path, mode="w")
     _, _, sims = build_legacy_namelists(cfg)
     assert sims["Dam_Inflow"]["Sim0_data_type"] == "grid"
     assert "Sim0_reservoir_files" not in sims["Dam_Inflow"]
@@ -263,9 +324,10 @@ def test_preconverted_station_simulation_preserves_paths(tmp_path, monkeypatch):
     rows = []
     for station in (101, 202):
         path = root / f"{station}.nc"
-        xr.Dataset({"qresv_in": ("time", [102., 103.])},
-                   coords={"time": pd.date_range("2001-01-01", periods=2)}).to_netcdf(path)
-        rows.append(dict(ID=str(station), SYEAR=2001, EYEAR=2001, LON=-100., LAT=40., DIR=str(path)))
+        xr.Dataset(
+            {"qresv_in": ("time", [102.0, 103.0])}, coords={"time": pd.date_range("2001-01-01", periods=2)}
+        ).to_netcdf(path)
+        rows.append(dict(ID=str(station), SYEAR=2001, EYEAR=2001, LON=-100.0, LAT=40.0, DIR=str(path)))
     csv = root / "sim.csv"
     pd.DataFrame(rows).to_csv(csv, index=False)
     entry = cfg.simulation["Sim0"]
@@ -279,21 +341,28 @@ def test_preconverted_station_simulation_preserves_paths(tmp_path, monkeypatch):
 
 def test_cli_check_uses_reservoir_metadata_without_reading_series(tmp_path, monkeypatch):
     from dataclasses import asdict
-    from click.testing import CliRunner
+
     import yaml
-    from openbench.cli.main import cli
+    from click.testing import CliRunner
+
     import openbench.data.reservoir as reservoir
+    from openbench.cli.main import cli
 
     cfg = fixture(tmp_path, monkeypatch, monthly=False)
-    cfg.simulation["Sim0"].variables = {"Dam_Inflow": {
-        "station_dim": "reservoir", "station_id_var": "resv_GRAND_ID",
-    }}
+    cfg.simulation["Sim0"].variables = {
+        "Dam_Inflow": {
+            "station_dim": "reservoir",
+            "station_id_var": "resv_GRAND_ID",
+        }
+    }
     raw = asdict(cfg)
     raw["reference"] = {"Dam_Inflow": "ResOpsUS", "overrides": cfg.reference.overrides}
     path = tmp_path / "config.yaml"
     path.write_text(yaml.safe_dump(raw))
+
     def forbidden(*args, **kwargs):
         raise AssertionError("check must not read reservoir time series")
+
     monkeypatch.setattr(reservoir, "read_reservoir_series", forbidden)
     result = CliRunner().invoke(cli, ["check", str(path)])
     assert result.exit_code == 0, result.output
@@ -325,6 +394,7 @@ def test_missing_reference_variable_cannot_use_another_quantity(tmp_path, monkey
 
 def test_custom_waterbody_fields_and_legacy_list_resolution(tmp_path, monkeypatch):
     from types import SimpleNamespace
+
     from openbench.data.custom.ResOpsUS_filter import _resolve_station_list
 
     cfg = fixture(tmp_path, monkeypatch, monthly=False)
@@ -335,7 +405,7 @@ def test_custom_waterbody_fields_and_legacy_list_resolution(tmp_path, monkeypatc
     info = runtime(cfg, main, refs, sims)
     proc = DatasetProcessing(vars(info))
     proc.prepare_source("sim")
-    with xr.open_dataset(Path(info.casedir)/"data/stn_ResOpsUS_Sim0/Dam_Inflow_sim_101_2001_2001.nc") as ds:
+    with xr.open_dataset(Path(info.casedir) / "data/stn_ResOpsUS_Sim0/Dam_Inflow_sim_101_2001_2001.nc") as ds:
         np.testing.assert_allclose(ds.qresv_in.values[:2].ravel(), [102.1, 102.2])
     for resolution, suffix in [(0.1, "06min"), (0.25, "15min")]:
         expected = tmp_path / "list" / f"ResOpsUS_reservoir_matched_{suffix}.csv"
@@ -359,9 +429,11 @@ def test_year_boundary_finite_screening_uses_adjusted_time(tmp_path, monkeypatch
 def test_reference_units_are_checked_from_the_file(tmp_path, monkeypatch):
     cfg = fixture(tmp_path, monkeypatch, monthly=False)
     path = tmp_path / "ref/101.nc"
+
     def corrupt(ds):
         ds.inflow.attrs["units"] = "mm/day"
         return ds
+
     change(path, corrupt)
     main, refs, sims = build_legacy_namelists(cfg)
     proc = DatasetProcessing(vars(runtime(cfg, main, refs, sims)))

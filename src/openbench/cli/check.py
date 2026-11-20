@@ -769,9 +769,13 @@ def _reference_metadata_findings(
         if fulllist:
             fulllist = _resolve_root_relative_path(fulllist, _root)
         try:
-            path = _resolve_station_list(SimpleNamespace(
-                ref_dir=_directory, ref_fulllist=fulllist, sim_grid_res=cfg.project.grid_res,
-            ))
+            path = _resolve_station_list(
+                SimpleNamespace(
+                    ref_dir=_directory,
+                    ref_fulllist=fulllist,
+                    sim_grid_res=cfg.project.grid_res,
+                )
+            )
             years = _station_year_span(str(path), _root, years, side="ref")
         except (OSError, ValueError, TypeError):
             pass  # The reference list/runtime checks report the path error.
